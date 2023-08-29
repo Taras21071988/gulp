@@ -11,6 +11,8 @@ const webp = require("gulp-webp");
 const imagemin = require("gulp-imagemin");
 const newer = require("gulp-newer");
 const svgSprite = require("gulp-svg-sprite");
+const fonter = require("gulp-fonter");
+const ttf2woff2 = require("gulp-ttf2woff2");
 
 //Работа с файлами стилей + autoprefixer
 function styles() {
@@ -41,15 +43,15 @@ function scripts() {
 //Функция для работы с изображениями
 function images() {
   return src(["app/images/src/*.*", "!app/images/src/*.svg"]) //Путь к файлам с указание не конвертировать файлы svg(но изображение svg все равно сжимается)
-    .pipe(newer("app/images/dist")) //Используем newer для того чтобы при повторном запуске не конвертировать изображения которые уже конвертировали
+    .pipe(newer("dist/images/")) //Используем newer для того чтобы при повторном запуске не конвертировать изображения которые уже конвертировали
     .pipe(avif({ quality: 60 })) // Указываем качество картинки после конвертации
 
     .pipe(src("app/images/src/*.*")) //Указываем путь к изначальным файлам изображений
-    .pipe(newer("app/images/dist")) // Прописываем перед каждым плагином для корректной работы
+    .pipe(newer("dist/images/")) // Прописываем перед каждым плагином для корректной работы
     .pipe(webp())
 
     .pipe(src("app/images/src/*.*")) //Указываем путь к изначальным файлам изображений
-    .pipe(newer("app/images/dist")) // Прописываем перед каждым плагином для корректной работы
+    .pipe(newer("dist/images/")) // Прописываем перед каждым плагином для корректной работы
     .pipe(imagemin())
 
     .pipe(dest("app/images/dist"));
@@ -71,6 +73,19 @@ function sprite() {
     .pipe(dest("app/images/dist"));
 }
 
+//Функция для конвертации шрифтов
+function fonts() {
+  return src("app/fonts/src/*.*")
+    .pipe(
+      fonter({
+        formats: ["woff", "ttf"], //Указываем в какие форматы конвертировать
+      })
+    )
+    .pipe(src("app/fonts/*.ttf"))
+    .pipe(ttf2woff2())
+    .pipe(dest("app/fonts"));
+}
+
 //Отслеживание изменений в описанных тут файлах
 function watching() {
   browserSync.init({
@@ -89,9 +104,13 @@ function building() {
   return src(
     [
       "app/css/style.min.css",
+      "app/fonts/*.*",
       "app/js/main.min.js",
       "app/**/*.html",
       "app/images/dist/*.*",
+      "!app/images/dist/*.svg",
+      "app/images/dist/sprite.svg",
+      "!app/images/dist/stack/*.*",
     ],
     {
       base: "app",
@@ -109,6 +128,7 @@ exports.images = images;
 exports.scripts = scripts;
 exports.watching = watching;
 exports.sprite = sprite;
+exports.fonts = fonts;
 
 //Выполнение build and clean - используется series(последовательное выполнение task)
 exports.build = series(cleanDist, building);
