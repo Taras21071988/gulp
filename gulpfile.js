@@ -24,7 +24,6 @@ function styles() {
 //Работа с файлами скриптов
 function scripts() {
   return src([
-    // "node_modules/swiper/swiper-bundle.js", //Подключение для тестов swiper
     "app/js/**/*.js", //Работа со всеми файлами которые имеют расширение .js внутри папки js - и вложенных папок в ней
     "!app/js/main.min.js", //Указываем что неиспользовать данный файл
   ])
