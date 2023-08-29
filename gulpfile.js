@@ -10,6 +10,7 @@ const avif = require("gulp-avif");
 const webp = require("gulp-webp");
 const imagemin = require("gulp-imagemin");
 const newer = require("gulp-newer");
+const svgSprite = require("gulp-svg-sprite");
 
 //Работа с файлами стилей + autoprefixer
 function styles() {
@@ -37,6 +38,39 @@ function scripts() {
     .pipe(browserSync.stream());
 }
 
+//Функция для работы с изображениями
+function images() {
+  return src(["app/images/src/*.*", "!app/images/src/*.svg"]) //Путь к файлам с указание не конвертировать файлы svg(но изображение svg все равно сжимается)
+    .pipe(newer("app/images/dist")) //Используем newer для того чтобы при повторном запуске не конвертировать изображения которые уже конвертировали
+    .pipe(avif({ quality: 60 })) // Указываем качество картинки после конвертации
+
+    .pipe(src("app/images/src/*.*")) //Указываем путь к изначальным файлам изображений
+    .pipe(newer("app/images/dist")) // Прописываем перед каждым плагином для корректной работы
+    .pipe(webp())
+
+    .pipe(src("app/images/src/*.*")) //Указываем путь к изначальным файлам изображений
+    .pipe(newer("app/images/dist")) // Прописываем перед каждым плагином для корректной работы
+    .pipe(imagemin())
+
+    .pipe(dest("app/images/dist"));
+}
+
+//Функция для работы с svg изображениями(не будет работать в автоматическом режиме)
+function sprite() {
+  return src("app/images/dist/*.svg")
+    .pipe(
+      svgSprite({
+        mode: {
+          stack: {
+            sprite: "../sprite.svg",
+            example: true,
+          },
+        },
+      })
+    ) //Тут настраиваем параметры svg изображений
+    .pipe(dest("app/images/dist"));
+}
+
 //Отслеживание изменений в описанных тут файлах
 function watching() {
   browserSync.init({
@@ -52,9 +86,17 @@ function watching() {
 
 //Task для группировки конечных файлов перед выдачей
 function building() {
-  return src(["app/css/style.min.css", "app/js/main.min.js", "app/**/*.html"], {
-    base: "app",
-  }).pipe(dest("dist"));
+  return src(
+    [
+      "app/css/style.min.css",
+      "app/js/main.min.js",
+      "app/**/*.html",
+      "app/images/dist/*.*",
+    ],
+    {
+      base: "app",
+    }
+  ).pipe(dest("dist"));
 }
 
 //Task для удаление папки dist при повторнои использование build
@@ -62,27 +104,11 @@ function cleanDist() {
   return src("dist").pipe(clean());
 }
 
-//Функция для работы с картинками
-function images() {
-  return src(["app/images/src/*.*", "!app/images/src/*.svg"]) //Путь к файлам с указание не конвертировать файлы svg
-    .pipe(newer("app/images/dist")) //Используем newer для того чтобы при повторном запуске не конвертировать изображения которые уже конвертировали
-    .pipe(avif({ quality: 60 })) // Указываем качество картинки после конвертации
-
-    .pipe(src("app/images/src/*.*")) //Указываем путь к изначальным файлам изображений
-    .pipe(newer("app/images/dist")) // Прописываем перед каждым плагином для корректной работы
-    .pipe(webp())
-
-    .pipe(src("app/images/src/*.*")) //Указываем путь к изначальным файлам изображений
-    .pipe(newer("app/images/dist")) // Прописываем перед каждым плагином для корректной работы
-    .pipe(imagemin())
-
-    .pipe(dest("app/images/dist"));
-}
-
 exports.styles = styles;
 exports.images = images;
 exports.scripts = scripts;
 exports.watching = watching;
+exports.sprite = sprite;
 
 //Выполнение build and clean - используется series(последовательное выполнение task)
 exports.build = series(cleanDist, building);
