@@ -6,6 +6,14 @@ const uglify = require("gulp-uglify-es").default;
 const browserSync = require("browser-sync").create();
 const autoprefixer = require("gulp-autoprefixer");
 const clean = require("gulp-clean");
+const avif = require("gulp-avif");
+const webp = require("gulp-webp");
+const imagemin = require("gulp-imagemin");
+const newer = require("gulp-newer");
+const svgSprite = require("gulp-svg-sprite");
+const fonter = require("gulp-fonter");
+const ttf2woff2 = require("gulp-ttf2woff2");
+const include = require("gulp-include");
 
 //Работа с файлами стилей + autoprefixer
 function styles() {
@@ -33,26 +41,94 @@ function scripts() {
     .pipe(browserSync.stream());
 }
 
-//Обновление браузера
-function browsersync() {
+//Функция для работы с изображениями
+function images() {
+  return src(["app/images/src/*.*", "!app/images/src/*.svg"]) //Путь к файлам с указание не конвертировать файлы svg(но изображение svg все равно сжимается)
+    .pipe(newer("app/images")) //Используем newer для того чтобы при повторном запуске не конвертировать изображения которые уже конвертировали
+    .pipe(avif({ quality: 60 })) // Указываем качество картинки после конвертации
+
+    .pipe(src("app/images/src/*.*")) //Указываем путь к изначальным файлам изображений
+    .pipe(newer("app/images")) // Прописываем перед каждым плагином для корректной работы
+    .pipe(webp())
+
+    .pipe(src("app/images/src/*.*")) //Указываем путь к изначальным файлам изображений
+    .pipe(newer("app/images")) // Прописываем перед каждым плагином для корректной работы
+    .pipe(imagemin())
+
+    .pipe(dest("app/images/"));
+}
+
+//Функция для работы с svg изображениями(не будет работать в автоматическом режиме)
+function sprite() {
+  return src("app/images/*.svg")
+    .pipe(
+      svgSprite({
+        mode: {
+          stack: {
+            sprite: "../sprite.svg",
+            example: true,
+          },
+        },
+      })
+    ) //Тут настраиваем параметры svg изображений
+    .pipe(dest("app/images"));
+}
+
+//Функция для конвертации шрифтов
+function fonts() {
+  return src("app/fonts/src/*.*")
+    .pipe(
+      fonter({
+        formats: ["woff", "ttf"], //Указываем в какие форматы конвертировать
+      })
+    )
+    .pipe(src("app/fonts/*.ttf"))
+    .pipe(ttf2woff2())
+    .pipe(dest("app/fonts"));
+}
+//Функция include для сборки  различных частей html кода в один файл
+function pages() {
+  return src("app/pages/*.html")
+    .pipe(
+      include({
+        includePaths: "app/components",
+      })
+    )
+    .pipe(dest("app"))
+    .pipe(browserSync.stream());
+}
+
+//Отслеживание изменений в описанных тут файлах
+function watching() {
   browserSync.init({
     server: {
       baseDir: "app/",
     },
-  });
-}
-//Отслеживание изменений в описанных тут файлах
-function watching() {
+  }); //Обновление браузера
   watch(["app/scss/style.scss"], styles);
+  watch(["app/images/src"], images);
   watch(["app/js/**/*.js"], scripts);
+  watch(["app/components/*", "app/pages/*"], pages);
   watch(["app/*.html"]).on("change", browserSync.reload);
 }
 
 //Task для группировки конечных файлов перед выдачей
 function building() {
-  return src(["app/css/style.min.css", "app/js/main.min.js", "app/**/*.html"], {
-    base: "app",
-  }).pipe(dest("dist"));
+  return src(
+    [
+      "app/css/style.min.css",
+      "app/fonts/*.*",
+      "app/js/main.min.js",
+      "app/index.html",
+      "app/images/*.*",
+      "!app/images/*.svg",
+      "app/images/sprite.svg",
+      "!app/images/stack/*.*",
+    ],
+    {
+      base: "app",
+    }
+  ).pipe(dest("dist"));
 }
 
 //Task для удаление папки dist при повторнои использование build
@@ -61,12 +137,15 @@ function cleanDist() {
 }
 
 exports.styles = styles;
+exports.images = images;
 exports.scripts = scripts;
 exports.watching = watching;
-exports.browsersync = browsersync;
+exports.sprite = sprite;
+exports.fonts = fonts;
+exports.pages = pages;
 
 //Выполнение build and clean - используется series(последовательное выполнение task)
 exports.build = series(cleanDist, building);
 
 //Параллельный запуск всех требуемых tasks - используется parallel(task выполняется паралельно друг другу)
-exports.default = parallel(styles, scripts, browsersync, watching);
+exports.default = parallel(styles, images, scripts, pages, watching);
