@@ -13,6 +13,7 @@ const newer = require("gulp-newer");
 const svgSprite = require("gulp-svg-sprite");
 const fonter = require("gulp-fonter");
 const ttf2woff2 = require("gulp-ttf2woff2");
+const include = require("gulp-include");
 
 //Работа с файлами стилей + autoprefixer
 function styles() {
@@ -43,23 +44,23 @@ function scripts() {
 //Функция для работы с изображениями
 function images() {
   return src(["app/images/src/*.*", "!app/images/src/*.svg"]) //Путь к файлам с указание не конвертировать файлы svg(но изображение svg все равно сжимается)
-    .pipe(newer("dist/images/")) //Используем newer для того чтобы при повторном запуске не конвертировать изображения которые уже конвертировали
+    .pipe(newer("app/images")) //Используем newer для того чтобы при повторном запуске не конвертировать изображения которые уже конвертировали
     .pipe(avif({ quality: 60 })) // Указываем качество картинки после конвертации
 
     .pipe(src("app/images/src/*.*")) //Указываем путь к изначальным файлам изображений
-    .pipe(newer("dist/images/")) // Прописываем перед каждым плагином для корректной работы
+    .pipe(newer("app/images")) // Прописываем перед каждым плагином для корректной работы
     .pipe(webp())
 
     .pipe(src("app/images/src/*.*")) //Указываем путь к изначальным файлам изображений
-    .pipe(newer("dist/images/")) // Прописываем перед каждым плагином для корректной работы
+    .pipe(newer("app/images")) // Прописываем перед каждым плагином для корректной работы
     .pipe(imagemin())
 
-    .pipe(dest("app/images/dist"));
+    .pipe(dest("app/images/"));
 }
 
 //Функция для работы с svg изображениями(не будет работать в автоматическом режиме)
 function sprite() {
-  return src("app/images/dist/*.svg")
+  return src("app/images/*.svg")
     .pipe(
       svgSprite({
         mode: {
@@ -70,7 +71,7 @@ function sprite() {
         },
       })
     ) //Тут настраиваем параметры svg изображений
-    .pipe(dest("app/images/dist"));
+    .pipe(dest("app/images"));
 }
 
 //Функция для конвертации шрифтов
@@ -85,6 +86,17 @@ function fonts() {
     .pipe(ttf2woff2())
     .pipe(dest("app/fonts"));
 }
+//Функция include для сборки  различных частей html кода в один файл
+function pages() {
+  return src("app/pages/*.html")
+    .pipe(
+      include({
+        includePaths: "app/components",
+      })
+    )
+    .pipe(dest("app"))
+    .pipe(browserSync.stream());
+}
 
 //Отслеживание изменений в описанных тут файлах
 function watching() {
@@ -96,6 +108,7 @@ function watching() {
   watch(["app/scss/style.scss"], styles);
   watch(["app/images/src"], images);
   watch(["app/js/**/*.js"], scripts);
+  watch(["app/components/*", "app/pages/*"], pages);
   watch(["app/*.html"]).on("change", browserSync.reload);
 }
 
@@ -106,11 +119,11 @@ function building() {
       "app/css/style.min.css",
       "app/fonts/*.*",
       "app/js/main.min.js",
-      "app/**/*.html",
-      "app/images/dist/*.*",
-      "!app/images/dist/*.svg",
-      "app/images/dist/sprite.svg",
-      "!app/images/dist/stack/*.*",
+      "app/index.html",
+      "app/images/*.*",
+      "!app/images/*.svg",
+      "app/images/sprite.svg",
+      "!app/images/stack/*.*",
     ],
     {
       base: "app",
@@ -129,9 +142,10 @@ exports.scripts = scripts;
 exports.watching = watching;
 exports.sprite = sprite;
 exports.fonts = fonts;
+exports.pages = pages;
 
 //Выполнение build and clean - используется series(последовательное выполнение task)
 exports.build = series(cleanDist, building);
 
 //Параллельный запуск всех требуемых tasks - используется parallel(task выполняется паралельно друг другу)
-exports.default = parallel(styles, images, scripts, watching);
+exports.default = parallel(styles, images, scripts, pages, watching);
