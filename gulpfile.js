@@ -45,6 +45,7 @@ function watching() {
     },
   }); //Обновление браузера
   watch(["app/scss/style.scss"], styles);
+  watch(["app/images/src"], images);
   watch(["app/js/**/*.js"], scripts);
   watch(["app/*.html"]).on("change", browserSync.reload);
 }
@@ -87,4 +88,4 @@ exports.watching = watching;
 exports.build = series(cleanDist, building);
 
 //Параллельный запуск всех требуемых tasks - используется parallel(task выполняется паралельно друг другу)
-exports.default = parallel(styles, scripts, watching);
+exports.default = parallel(styles, images, scripts, watching);
